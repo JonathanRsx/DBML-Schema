@@ -1,10 +1,84 @@
 const { widget } = figma;
-
 const { AutoLayout, Input, Text, useSyncedState, useEffect } = widget;
 
 // async function loadFonts() {
 //   await figma.loadFontAsync({ family: "Inter", style: "Medium" });
 // }
+interface Row {
+  name: string;
+  type: string;
+  isPrimaryKey: boolean;
+}
+
+interface Relation {
+  fromTable: string;
+  fromColumn: string;
+  direction: string;
+  toTable: string;
+  toColumn: string;
+}
+
+function parseDBML(dbml: string): {
+  tables: { [key: string]: Row[] };
+  relations: Relation[];
+} {
+  const tableRegex = /Table\s+(\w+)\s+\{([^}]+)\}/g;
+  const relationRegex1 =
+    /(\w+)\s+\w+\s+\[ref:\s+([<>-]{1,2})\s*(\w+)\.(\w+)\]/g; // Format: [ref: < TableName.ColumnName]
+  const relationRegex2 =
+    /Ref:\s+"([^"]+)"\."([^"]+)"\s+([<>-]{1,2})\s+"([^"]+)"\."([^"]+)"/g; // Format: Ref: "TableName1"."ColumnName1" < "TableName2"."ColumnName2"
+
+  const tables: { [key: string]: Row[] } = {};
+  const relationsSet: Set<string> = new Set(); // Set to store unique relations
+
+  let tableMatch;
+  while ((tableMatch = tableRegex.exec(dbml)) !== null) {
+    const [, tableName, rowsText] = tableMatch;
+    const rows = rowsText
+      .trim()
+      .split("\n")
+      .map((row) => row.trim())
+      .filter((row) => row);
+
+    //tables[tableName] = rows;
+    tables[tableName] = rows.map((row) => {
+      const [name, type, ...attributes] = row.split(/\s+/);
+      const isPrimaryKey = attributes.some(
+        (attr) =>
+          attr.toLowerCase() === "[pk]" ||
+          attr.toLowerCase() === "[primary key]"
+      );
+      return { name, type, isPrimaryKey };
+    });
+
+    let relationMatch;
+    while ((relationMatch = relationRegex1.exec(rowsText)) !== null) {
+      const [, fromColumn, direction, toTable, toColumn] = relationMatch;
+      const relationKey = `${tableName}.${fromColumn}.${direction}.${toTable}.${toColumn}`;
+      relationsSet.add(relationKey);
+    }
+  }
+
+  let relationMatch;
+  while ((relationMatch = relationRegex2.exec(dbml)) !== null) {
+    const [, fromTable, fromColumn, direction, toTable, toColumn] =
+      relationMatch;
+    const relationKey = `${fromTable}.${fromColumn}.${direction}.${toTable}.${toColumn}`;
+    relationsSet.add(relationKey);
+  }
+
+  // Convert the set back to an array of relations
+  const relations = Array.from(relationsSet).map((relationKey) => {
+    const [fromTable, fromColumn, direction, toTable, toColumn] =
+      relationKey.split(".");
+    return { fromTable, fromColumn, direction, toTable, toColumn };
+  });
+
+  console.log("Tables:", tables);
+  console.log("Relations:", relations);
+
+  return { tables, relations };
+}
 
 // Fonction pour créer une table à partir de la chaîne DBML
 function createTable(tableName: string) {
@@ -24,17 +98,49 @@ function createTable(tableName: string) {
     table.primaryAxisSizingMode = "AUTO";
     table.counterAxisSizingMode = "AUTO";
     table.itemSpacing = 0;
-    table.paddingTop = 10;
-    table.paddingBottom = 10;
-    table.paddingLeft = 10;
-    table.paddingRight = 10;
+    table.bottomRightRadius = 8;
+    table.bottomLeftRadius = 8;
+    table.topRightRadius = 8;
+    table.topLeftRadius = 8;
     table.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
     table.strokes = [{ type: "SOLID", color: { r: 0.85, g: 0.85, b: 0.85 } }];
+    table.effects = [
+      {
+        type: "DROP_SHADOW",
+        radius: 2,
+        visible: true,
+        color: { r: 0, g: 0, b: 0, a: 0.05 },
+        offset: { x: 0, y: 2 },
+        spread: 0,
+        blendMode: "NORMAL",
+        showShadowBehindNode: false,
+      },
+      {
+        type: "DROP_SHADOW",
+        radius: 6,
+        visible: true,
+        color: { r: 0, g: 0, b: 0, a: 0.05 },
+        offset: { x: 0, y: 6 },
+        spread: 0,
+        blendMode: "NORMAL",
+        showShadowBehindNode: false,
+      },
+      {
+        type: "DROP_SHADOW",
+        radius: 12,
+        visible: true,
+        color: { r: 0, g: 0, b: 0, a: 0.05 },
+        offset: { x: 0, y: 12 },
+        spread: 0,
+        blendMode: "NORMAL",
+        showShadowBehindNode: false,
+      },
+    ];
 
     // Create title
     const titleText = figma.createText();
-    titleText.characters = tableName;
-    titleText.fontSize = 20;
+    titleText.characters = "🌐  " + tableName;
+    titleText.fontSize = 16;
     titleText.fills = [{ type: "SOLID", color: { r: 0, g: 0, b: 0 } }];
 
     //titleFrame
@@ -44,8 +150,8 @@ function createTable(tableName: string) {
     titleFrame.counterAxisSizingMode = "AUTO";
     titleFrame.name = tableName;
     titleFrame.itemSpacing = 0;
-    titleFrame.paddingTop = 12;
-    titleFrame.paddingBottom = 12;
+    titleFrame.paddingTop = 20;
+    titleFrame.paddingBottom = 20;
     titleFrame.paddingLeft = 20;
     titleFrame.paddingRight = 20;
 
@@ -68,7 +174,8 @@ function createTable(tableName: string) {
   return table;
 }
 
-function createRow(name: string, type: string, table: FrameNode) {
+function createRow(row: Row, table: FrameNode): FrameNode {
+  const { name, type, isPrimaryKey } = row;
   // Create a new AutoLayout frame for each row
   const rowFrame = figma.createFrame();
   rowFrame.layoutMode = "HORIZONTAL";
@@ -87,9 +194,14 @@ function createRow(name: string, type: string, table: FrameNode) {
 
   // Add the name
   const nameText = figma.createText();
-  nameText.characters = name;
+  nameText.characters = name + (isPrimaryKey ? " 🔑" : "");
   nameText.fontSize = 16;
-  nameText.fills = [{ type: "SOLID", color: { r: 0, g: 0, b: 0 } }];
+  nameText.fills = [
+    {
+      type: "SOLID",
+      color: isPrimaryKey ? { r: 0, g: 0, b: 0 } : { r: 0.3, g: 0.3, b: 0.3 },
+    },
+  ];
 
   //nameFrame
   const nameFrame = figma.createFrame();
@@ -107,7 +219,7 @@ function createRow(name: string, type: string, table: FrameNode) {
   typeText.textAlignHorizontal = "RIGHT";
   typeText.characters = type;
   typeText.fontSize = 16;
-  typeText.fills = [{ type: "SOLID", color: { r: 0, g: 0, b: 0 } }];
+  typeText.fills = [{ type: "SOLID", color: { r: 0.55, g: 0.55, b: 0.55 } }];
 
   //typeFrame
   const typeFrame = figma.createFrame();
@@ -120,26 +232,48 @@ function createRow(name: string, type: string, table: FrameNode) {
   rowFrame.appendChild(typeFrame);
 
   table.appendChild(rowFrame);
+
+  return rowFrame;
 }
 
-function createTableFromDBML(dbml: string) {
-  // Split the input by recognizing the start of a new table definition
-  const tableDefinitions = dbml.split(/Table\s+/).filter(Boolean);
+function createConnector(from: SceneNode, to: SceneNode, direction: string) {
+  const connector = figma.createConnector();
+  connector.connectorStart = { endpointNodeId: from.id, magnet: "AUTO" };
+  connector.connectorEnd = { endpointNodeId: to.id, magnet: "AUTO" };
+  connector.strokeWeight = 2;
+  connector.strokeJoin = "ROUND";
+  switch (direction) {
+    case "-":
+      connector.connectorStartStrokeCap = "NONE";
+      connector.connectorEndStrokeCap = "NONE";
+      break;
+    case "<":
+      connector.connectorStartStrokeCap = "NONE";
+      connector.connectorEndStrokeCap = "TRIANGLE_FILLED";
+      break;
+    case ">":
+      connector.connectorStartStrokeCap = "TRIANGLE_FILLED";
+      connector.connectorEndStrokeCap = "NONE";
+      break;
+    case "<>":
+      connector.connectorStartStrokeCap = "TRIANGLE_FILLED";
+      connector.connectorEndStrokeCap = "TRIANGLE_FILLED";
+      break;
+  }
+  // connector.stroke = { r: 0, g: 0, b: 0 };
+  figma.currentPage.appendChild(connector);
+}
 
-  // Iterate over each table definition
-  tableDefinitions.forEach((tableDefinition) => {
-    // Extract the table name and rows from the DBML schema
-    const tableMatch = tableDefinition.match(/(\w+)\s+\{([^}]+)\}/);
-    if (!tableMatch) return;
+function createTablesFromDBML(dbml: string) {
+  const { tables, relations } = parseDBML(dbml);
 
-    const [, tableName, rowsText] = tableMatch;
-    const rows = rowsText
-      .trim()
-      .split("\n")
-      .map((row) => row.trim())
-      .filter((row) => row);
+  const tableMap: { [key: string]: FrameNode } = {};
+  const rowMap: { [key: string]: { [key: string]: FrameNode } } = {};
 
+  for (const tableName in tables) {
     const table = createTable(tableName);
+    tableMap[tableName] = table;
+    rowMap[tableName] = {};
 
     // Remove existing rows from the table
     table.children.forEach((child) => {
@@ -148,13 +282,24 @@ function createTableFromDBML(dbml: string) {
       }
     });
 
-    // Add or update rows
-    rows.forEach((row) => {
-      const [name, type] = row.split(" ").filter((token) => token);
-      createRow(name, type, table);
-    });
-    console.log(table.children);
-  });
+    for (const row of tables[tableName]) {
+      console.log(row);
+      //const [name, type] = row.split(" ").filter((token) => token);
+      //const rowFrame = createRow(name, type, table);
+      const rowFrame = createRow(row, table);
+      rowMap[tableName][row.name] = rowFrame;
+    }
+  }
+
+  for (const relation of relations) {
+    const { fromTable, fromColumn, direction, toTable, toColumn } = relation;
+    const fromRow = rowMap[fromTable]?.[fromColumn];
+    const toRow = rowMap[toTable]?.[toColumn];
+
+    if (fromRow && toRow) {
+      createConnector(fromRow, toRow, direction);
+    }
+  }
 }
 
 function Widget() {
@@ -169,7 +314,7 @@ function Widget() {
   // Utilisation de l'effet pour créer le rectangle lorsque l'état change
   useEffect(() => {
     if (createRectangle) {
-      createTableFromDBML(text);
+      createTablesFromDBML(text);
       setCreateRectangle(false); // Réinitialiser l'état après la création du rectangle
     }
   }, [createRectangle]);
