@@ -1,5 +1,5 @@
 const { widget } = figma;
-const { AutoLayout, Input, Text, useSyncedState, useEffect } = widget;
+const { AutoLayout, Input, Image, Text, useSyncedState, useEffect } = widget;
 
 // async function loadFonts() {
 //   await figma.loadFontAsync({ family: "Inter", style: "Medium" });
@@ -84,7 +84,7 @@ function parseDBML(dbml: string): {
 function createTable(tableName: string) {
   // Check if a table with the same name already exists
   const existingTable = figma.currentPage.findChild(
-    (node) => node.name === tableName && node.type === "FRAME"
+    (node) => node.name === "[TABLE] " + tableName && node.type === "FRAME"
   );
 
   let table;
@@ -93,7 +93,7 @@ function createTable(tableName: string) {
   } else {
     // Create a new AutoLayout frame for the table
     table = figma.createFrame();
-    table.name = tableName;
+    table.name = "[TABLE] " + tableName;
     table.layoutMode = "VERTICAL";
     table.primaryAxisSizingMode = "AUTO";
     table.counterAxisSizingMode = "AUTO";
@@ -241,6 +241,12 @@ function createConnector(from: SceneNode, to: SceneNode, direction: string) {
   connector.connectorStart = { endpointNodeId: from.id, magnet: "AUTO" };
   connector.connectorEnd = { endpointNodeId: to.id, magnet: "AUTO" };
   connector.strokeWeight = 2;
+  connector.strokes = [
+    {
+      type: "SOLID",
+      color: { r: 0.85, g: 0.85, b: 0.85 },
+    },
+  ];
   connector.strokeJoin = "ROUND";
   switch (direction) {
     case "-":
@@ -270,6 +276,17 @@ function createTablesFromDBML(dbml: string) {
   const tableMap: { [key: string]: FrameNode } = {};
   const rowMap: { [key: string]: { [key: string]: FrameNode } } = {};
 
+  //remove deleted table
+  figma.currentPage.children.forEach((node) => {
+    if (
+      node.type === "FRAME" &&
+      node.name.startsWith("[TABLE]") &&
+      !(node.name.replace("[TABLE] ", "") in tables)
+    ) {
+      node.remove();
+    }
+  });
+
   for (const tableName in tables) {
     const table = createTable(tableName);
     tableMap[tableName] = table;
@@ -283,9 +300,6 @@ function createTablesFromDBML(dbml: string) {
     });
 
     for (const row of tables[tableName]) {
-      console.log(row);
-      //const [name, type] = row.split(" ").filter((token) => token);
-      //const rowFrame = createRow(name, type, table);
       const rowFrame = createRow(row, table);
       rowMap[tableName][row.name] = rowFrame;
     }
@@ -330,6 +344,14 @@ function Widget() {
       stroke="#dcdcdc"
       overflow="scroll"
       minHeight={200}
+      cornerRadius={20}
+      effect={{
+        type: "drop-shadow",
+        color: { r: 0, g: 0, b: 0, a: 0.1 },
+        offset: { x: 0, y: 4 },
+        blur: 12,
+        spread: 2,
+      }}
     >
       <Input
         value={text}
