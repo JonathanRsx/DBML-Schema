@@ -1,5 +1,13 @@
 const { widget } = figma;
-const { AutoLayout, Input, Image, Text, useSyncedState, useEffect } = widget;
+const {
+  AutoLayout,
+  Input,
+  Image,
+  Text,
+  useSyncedState,
+  useEffect,
+  usePropertyMenu,
+} = widget;
 
 // async function loadFonts() {
 //   await figma.loadFontAsync({ family: "Inter", style: "Medium" });
@@ -324,6 +332,32 @@ function Widget() {
   );
 
   const [text, setText] = useSyncedState("text", "");
+
+  usePropertyMenu(
+    [
+      {
+        itemType: "action",
+        tooltip: "Edit content",
+        propertyName: "Edit",
+      },
+      // {
+      //   itemType: 'separator',
+      // }
+    ],
+    ({ propertyName, propertyValue }) => {
+      if (propertyName === "Edit") {
+        figma.notify("Edit content clicked");
+        return new Promise((resolve) => {
+          figma.showUI(__html__, {
+            width: 400,
+            height: 500,
+            title: "DBML Editor",
+          });
+          figma.ui.postMessage("test");
+        });
+      }
+    }
+  );
 
   // Utilisation de l'effet pour créer le rectangle lorsque l'état change
   useEffect(() => {

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Simple DBML Editor</title>
+    <style>
+      /* Reset default margin and padding */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      /* Full viewport height */
+      html,
+      body {
+        height: 100%;
+      }
+
+      /* CSS styles */
+      body {
+        font-family: Arial, sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background-color: #f0f0f0;
+        margin: 0;
+        padding: 0;
+      }
+
+      .editor {
+        width: 80%;
+        height: 80vh; /* Adjust height as needed */
+        font-size: 14px;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        resize: vertical; /* Allow vertical resizing */
+        overflow-y: scroll; /* Add vertical scroll if needed */
+      }
+
+      .highlight {
+        color: purple; /* Purple color for highlighting */
+        font-weight: bold; /* Bold font for highlighting */
+      }
+    </style>
+  </head>
+  <body>
+    <textarea
+      id="editor"
+      class="editor"
+      placeholder="Enter your DBML code here..."
+    ></textarea>
+
+    <script>
+      // JavaScript
+      document.addEventListener("DOMContentLoaded", function () {
+        const editor = document.getElementById("editor");
+
+        // Function to handle input change
+        function handleInputChange() {
+          const text = editor.value;
+          const highlightedText = text.replace(
+            /\b(table)\b/g,
+            '<span class="highlight">$1</span>'
+          );
+          editor.innerHTML = highlightedText;
+        }
+
+        // Add event listener for input changes
+        editor.addEventListener("input", handleInputChange);
+      });
+    </script>
+  </body>
+</html>
